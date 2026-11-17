@@ -86,8 +86,9 @@ function synth(opts) {
     voicing.forEach((m, j) => tone(t + j * 0.006, beat * 0.98, hz(m), changed ? 0.1 : 0.07, 8, 2.5));
     // Melody: chord tone on the beat, passing tone on the off-beat.
     const mel = 72 + p.tones[(k * 7) % p.tones.length] - 12 * (p.tones[(k * 7) % p.tones.length] > 7 ? 1 : 0);
-    tone(t, beat * 0.5, hz(mel), 0.08, 3, 4);
-    tone(t + beat / 2, beat * 0.45, hz(mel + 2), 0.05, 3, 4);
+    const vg = opts.vocal || 1;
+    tone(t, beat * 0.5, hz(mel), 0.08 * vg, 3, opts.vocal ? 0.5 : 4);
+    tone(t + beat / 2, beat * 0.45, hz(mel + (k % 3 === 0 ? 2 : 1)), 0.05 * vg, 3, opts.vocal ? 0.5 : 4);
   }
   // Light noise floor.
   for (let i = 0; i < n; i++) y[i] += (rand() * 2 - 1) * 0.003;

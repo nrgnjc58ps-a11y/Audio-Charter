@@ -138,7 +138,9 @@
   }
 
   // ---------- tempo ----------
-  function autocorr(env, maxLag) {
+  // Autocorrelation of the envelope with its mean removed (noise then scores ~0 at every lag).
+  function autocorr(env0, maxLag) {
+    const m = mean(env0), env = env0.map(v => v - m);
     const n = env.length, ac = new Float64Array(maxLag + 1);
     for (let lag = 0; lag <= maxLag; lag++) {
       let s = 0;
@@ -146,6 +148,15 @@
       ac[lag] = s / (n - lag);
     }
     return ac;
+  }
+
+  // How strongly an envelope repeats at some beat period (0 = noise, ~1 = perfectly regular).
+  function periodicity(env, fps) {
+    const ac = autocorr(env, Math.ceil(fps * 60 / 50));
+    if (!ac[0]) return 0;
+    let best = 0;
+    for (let lag = Math.floor(fps * 60 / 220); lag < ac.length; lag++) best = Math.max(best, ac[lag]);
+    return best / ac[0];
   }
 
   // Returns { bpm, period (frames), candidates }
@@ -431,23 +442,44 @@
     return path;
   }
 
-  function emissions(beatTreble, beatBass, beatLoud, chordSet, keyInfo) {
-    const kappa = 14;
+  // Remove what stays constant over a few bars (room echo, hum, held notes) so
+  // that what changes from chord to chord stands out. Vectors are sum-normalized first.
+  function enhanceContrast(vecs, win, alpha) {
+    const n = vecs.length;
+    const unit = vecs.map(v => { const s = v.reduce((a, x) => a + x, 0) || 1; return v.map(x => x / s); });
+    const pre = [new Float64Array(12)];
+    for (let i = 0; i < n; i++) { const r = Float64Array.from(pre[i]); for (let k = 0; k < 12; k++) r[k] += unit[i][k]; pre.push(r); }
+    return unit.map((v, i) => {
+      const a = Math.max(0, i - win), b = Math.min(n, i + win + 1);
+      const out = new Float64Array(12);
+      for (let k = 0; k < 12; k++) out[k] = Math.max(0, v[k] - alpha * (pre[b][k] - pre[a][k]) / (b - a));
+      return out;
+    });
+  }
+
+  // Emission scores per beat, standardized across chords so that the contrast
+  // between candidates does not depend on how clean the recording is.
+  function emissions(beatTreble, beatBass, beatLoud, chordSet, keyInfo, kappa) {
+    kappa = kappa || 2.2;
     const kw = keyInfo ? diatonicWeights(keyInfo.tonic, keyInfo.minor) : null;
     return beatTreble.map((t, i) => {
       const b = beatBass[i];
       const bsum = b.reduce((a, v) => a + v, 0) || 1;
-      const row = new Float64Array(chordSet.length + 1);
-      for (let s = 0; s < chordSet.length; s++) {
+      const S = chordSet.length;
+      const raw = new Float64Array(S);
+      for (let s = 0; s < S; s++) {
         const ch = chordSet[s];
         let sc = cosine(t, ch.tpl) - ch.penalty;
-        // Bass support: root in the bass is likely; another chord tone in the bass is fine too.
+        // Bass support: root in the bass is likely.
         sc += 0.18 * (b[ch.root] / bsum);
         if (kw) sc += 0.04 * (kw.get(ch.root + '|' + qclass(ch.quality)) || 0);
-        row[s] = kappa * sc;
+        raw[s] = sc;
       }
+      const m = mean(raw), sd = std(raw) || 1;
+      const row = new Float64Array(S + 1);
+      for (let s = 0; s < S; s++) row[s] = kappa * (raw[s] - m) / sd;
       // No-chord state: wins only when the beat is near silent.
-      row[chordSet.length] = beatLoud[i] < 0.06 ? kappa * 2 : -kappa * 2;
+      row[S] = beatLoud[i] < 0.06 ? kappa * 10 : -kappa * 10;
       return row;
     });
   }
@@ -523,7 +555,10 @@
     if (opts.bpm) tempo = { bpm: opts.bpm, period: on.fps * 60 / opts.bpm };
     else {
       // Kick drum and bass usually mark the beat; hi-hats often mark eighths.
-      const mix = on.env.map((v, i) => v + 1.5 * on.low[i]);
+      // But phone speakers and mics lose the low end, leaving only noise there,
+      // so lean on it only as far as it actually pulses in a tempo range.
+      const lowW = 1.5 * Math.max(0, Math.min(1, (periodicity(on.low, on.fps) - 0.12) / 0.2));
+      const mix = on.env.map((v, i) => v + lowW * on.low[i]);
       tempo = estimateTempo(mix, on.fps, { priorBpm: opts.priorBpm });
     }
     const tb = trackBeats(on.env, tempo.period, opts.tightness || 100);
@@ -560,8 +595,11 @@
     const nb = bt.length;
 
     // Pass 1: chords with a flat change cost, no key.
-    const flatCost = new Array(nb).fill(9);
-    const path1 = viterbi(emissions(bt, bb, loud, chordSet, null), flatCost).map(s => s === NC ? -1 : s);
+    const T = opts.tune || {};
+    const btE = enhanceContrast(bt, T.win || 8, T.alpha ?? 0.4);
+    const kap = T.kappa || 2.2;
+    const flatCost = new Array(nb).fill(T.flat || 6);
+    const path1 = viterbi(emissions(btE, bb, loud, chordSet, null, kap), flatCost).map(s => s === NC ? -1 : s);
 
     // Downbeats (and optional 3 vs 4 detection).
     let bpb = bpbOpt;
@@ -580,11 +618,11 @@
     // Pass 2: chords with key prior and metrical change costs.
     const cost = new Array(nb).fill(0).map((_, i) => {
       const pos = ((i - db.phase) % bpb + bpb) % bpb;
-      if (pos === 0) return 4;                              // bar line: cheap
-      if (bpb % 2 === 0 && pos === bpb / 2) return 7;      // half bar
-      return 13;                                           // other beats: rare
+      if (pos === 0) return T.c0 || 3;                     // bar line: cheap
+      if (bpb % 2 === 0 && pos === bpb / 2) return T.c2 || 5.5; // half bar
+      return T.c1 || 10;                                   // other beats: rare
     });
-    const path = viterbi(emissions(bt, bb, loud, chordSet, key), cost).map(s => s === NC ? -1 : s);
+    const path = viterbi(emissions(btE, bb, loud, chordSet, key, kap), cost).map(s => s === NC ? -1 : s);
 
     // Bars.
     const bars = [];

@@ -3,6 +3,9 @@
 'use strict';
 const DSP = require('../js/dsp.js');
 const { synth, parse } = require('./synth.js');
+const { degrade } = require('./degrade.js');
+const PHONE = process.argv.includes('--phone');
+const HARSH = process.argv.includes('--harsh');
 
 const NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 const itemName = (it) => it.nc ? 'N.C.' : NAMES[it.root] + it.quality + (it.bass >= 0 ? '/' + NAMES[it.bass] : '');
@@ -19,7 +22,8 @@ const cases = [
 const KEYN = (k) => NAMES[k.tonic] + (k.minor ? 'm' : '');
 let fails = 0;
 for (const c of cases) {
-  const s = synth({ ...c, seed: 7 });
+  const s = synth({ ...c, seed: 7, vocal: HARSH ? 6 : PHONE ? 3 : 0 });
+  if (PHONE || HARSH) s.y = degrade(s.y, s.sr, HARSH ? { seed: 5, snr: 4, reverb: 0.65, lowCut: 300, highCut: 3500 } : { seed: 5 });
   const t0 = Date.now();
   const r = DSP.analyze(s.y, { beatsPerBar: c.bpb || 4, sections: true });
   const ms = Date.now() - t0;

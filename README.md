@@ -44,6 +44,8 @@ It is a **draft**. On clear pop/rock recordings expect most chords right. Busy m
 ```sh
 python3 -m http.server 8000         # then open http://localhost:8000
 node tests/dsp.test.js              # engine against synthetic songs with known answers
+node tests/dsp.test.js --phone      # same songs, made to sound like a phone recording
+node tests/dsp.test.js --harsh      # stress test: thin, echoey, noisy, loud vocal
 node tests/export.test.mjs          # Chart Maker format
 node tests/synth.js sample.wav      # make a test recording
 ```
