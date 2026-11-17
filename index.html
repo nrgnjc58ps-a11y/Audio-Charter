@@ -36,7 +36,10 @@
     <section class="library">
       <div class="lib-head">
         <h2>Your songs</h2>
-        <button id="btnExportAll" class="ghost small" type="button" hidden>Export all…</button>
+        <div class="row">
+          <button id="btnDeleteSelected" class="danger small" type="button" hidden>Delete</button>
+          <button id="btnExportAll" class="ghost small" type="button" hidden>Export all…</button>
+        </div>
       </div>
       <ul id="libraryList" class="lib-list"></ul>
       <p id="libraryEmpty" class="muted">Songs you chart are saved on this device.</p>

@@ -111,6 +111,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .lib-item .open { flex: 1; text-align: left; background: none; border: 0; padding: 8px 0; min-height: var(--tap); }
 .lib-item .open strong { display: block; }
 .lib-item .open small { color: var(--muted); }
+.lib-item .del { flex: none; width: var(--tap); height: var(--tap); border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 18px; }
+@media (hover: hover) { .lib-item .del:hover { border-color: var(--danger); background: var(--surface-2); } }
 .lib-item input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); }
 .foot { margin-top: 24px; font-size: 14px; }
 

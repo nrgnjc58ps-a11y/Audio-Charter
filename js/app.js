@@ -126,13 +126,34 @@ async function renderLibrary() {
     if (p.key) bits.push(p.key);
     if (p.tempo) bits.push(Math.round(p.tempo) + ' BPM');
     bits.push(new Date(p.updated).toLocaleDateString());
-    li.innerHTML = `<input type="checkbox" aria-label="Select for export"><button class="open" type="button"><strong></strong><small></small></button>`;
+    li.innerHTML = `<input type="checkbox" aria-label="Select"><button class="open" type="button"><strong></strong><small></small></button><button class="del" type="button">🗑</button>`;
     li.querySelector('strong').textContent = p.title || 'Untitled';
     li.querySelector('small').textContent = bits.join(' · ');
     li.querySelector('input').dataset.id = p.id;
+    li.querySelector('input').addEventListener('change', updateLibraryButtons);
     li.querySelector('.open').addEventListener('click', () => openProject(p.id));
+    const del = li.querySelector('.del');
+    del.setAttribute('aria-label', `Delete ${p.title || 'Untitled'}`);
+    del.addEventListener('click', () => deleteSongs([p]));
     ul.appendChild(li);
   }
+  updateLibraryButtons();
+}
+
+function checkedIds() { return [...document.querySelectorAll('#libraryList input:checked')].map(i => i.dataset.id); }
+function updateLibraryButtons() {
+  const n = checkedIds().length;
+  $('btnDeleteSelected').hidden = n === 0;
+  $('btnDeleteSelected').textContent = `Delete ${n}`;
+  $('btnExportAll').textContent = n ? `Export ${n}…` : 'Export all…';
+}
+async function deleteSongs(songs) {
+  if (!songs.length) return;
+  const what = songs.length === 1 ? `“${songs[0].title || 'Untitled'}”` : `${songs.length} songs`;
+  if (!confirm(`Delete ${what} and the audio from this phone? This can't be undone.`)) return;
+  for (const p of songs) await store.remove(p.id);
+  await renderLibrary();
+  toast(`Deleted ${what}.`);
 }
 
 // ---------------------------------------------------------------- loading
@@ -1005,6 +1026,10 @@ function bind() {
   $('btnRecord').addEventListener('click', startRecording);
   $('recStop').addEventListener('click', stopRecording);
   $('recordDialog').addEventListener('close', () => { if (recorder) { recorder.cancel(); recorder = null; } });
+  $('btnDeleteSelected').addEventListener('click', async () => {
+    const ids = checkedIds(), all = await store.list();
+    deleteSongs(all.filter(p => ids.includes(p.id)));
+  });
   $('btnExportAll').addEventListener('click', async () => {
     const all = await store.list();
     const checked = [...document.querySelectorAll('#libraryList input:checked')].map(i => i.dataset.id);
