@@ -168,7 +168,7 @@ async function openAudioBlob(blob, name) {
     runAuto();
   } else {
     renderBars();
-    toast('Saved, but this phone could not decode it for the waveform and auto draft. You can still play it and tap along.', 6000);
+    toast(/^video\//.test(blob.type) || /\.(mov|mp4|m4v)$/i.test(name || '') ? 'Saved, but this phone could not read the sound from this video for the waveform and auto draft. You can still play it and tap along.' : 'Saved, but this phone could not decode it for the waveform and auto draft. You can still play it and tap along.', 6000);
   }
 }
 

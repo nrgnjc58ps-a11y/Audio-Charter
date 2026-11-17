@@ -1,5 +1,5 @@
 // Offline support: cache the app shell, serve it cache-first, refresh in the background.
-const CACHE = 'audio-charter-v6';
+const CACHE = 'audio-charter-v7';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/app.js', 'js/audio.js', 'js/chords.js', 'js/export.js', 'js/store.js', 'js/dsp.js', 'js/analysis-worker.js',
