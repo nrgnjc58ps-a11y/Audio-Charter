@@ -31,3 +31,8 @@ const solo = toBackup([{ ...project, sections: [] }]).songs[0];
 assert.equal(solo.sections.length, 1);
 assert.equal(solo.sections[0].bars, 'E | | C#m | | A | B/A | E |');
 console.log('export tests passed');
+
+// Chart Maker markings: push and N.C. pass through; a marking never counts as a chord.
+assert.equal(barsText(['C', '> D', '', 'n.c.', 'D']), 'C | > D | | N.C. | D');
+assert.equal(barsText(['D .', 'D', 'E-7']), 'D . | | Em7');
+console.log('marking tests passed');

@@ -27,7 +27,7 @@ export function barsText(texts, carried) {
       if (i === 0 && last) return last;
       return '';
     }
-    const single = !/\s/.test(t);
+    const single = !/\s/.test(t) && /^[A-G]/.test(t);
     const out = single && t === last && i > 0 ? '' : t;
     last = lastChordOf(t);
     return out;

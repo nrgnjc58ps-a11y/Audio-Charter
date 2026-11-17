@@ -93,8 +93,8 @@ export function normalizeChord(token) {
 /** Normalizes the text for one bar (chords separated by spaces). "%", "-" or "/" alone mean "same". */
 export function normalizeBar(text) {
   const parts = (text || '').replace(/\|/g, ' ').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 1 && /^(%|-|\/|\.)$/.test(parts[0])) return '';
-  return parts.map(normalizeChord).join(' ');
+  if (parts.length === 1 && /^(%|-|\/)$/.test(parts[0])) return '';
+  return parts.map(t => /^n\.?c\.?$/i.test(t) ? 'N.C.' : normalizeChord(t)).join(' ');
 }
 
 /** { root pc, rootName, rest, bass pc, bassName } or null for non-chords. */
@@ -132,8 +132,24 @@ export function diatonicChords(key) {
     : [at(0, ''), at(2, 'm'), at(4, 'm'), at(5, ''), at(7, ''), at(9, 'm'), at(10, '')];
 }
 
-/** Last chord symbol written in a bar's text, or '' */
+/** True for a chord symbol or N.C. (not markings like ">" push or "." hold). */
+export function isChordToken(tok) {
+  return /^[A-G]/.test(tok || '') || /^N\.?C\.?$/i.test(tok || '');
+}
+
+/** Last chord symbol written in a bar's text (markings skipped), or '' */
 export function lastChordOf(text) {
-  const parts = (text || '').trim().split(/\s+/).filter(Boolean);
+  const parts = (text || '').trim().split(/\s+/).filter(isChordToken);
   return parts.length ? parts[parts.length - 1] : '';
+}
+
+/** Chords borrowed from the parallel key, common in rock and pop. */
+export function borrowedChords(key) {
+  const k = parseKey(key);
+  if (!k) return [];
+  const sp = spellingFor(k);
+  const at = (st, q) => sp[(k.tonic + st) % 12] + q;
+  return k.minor
+    ? [at(0, ''), at(5, ''), at(1, ''), at(2, ''), at(9, 'm')]
+    : [at(10, ''), at(8, ''), at(3, ''), at(2, ''), at(4, ''), at(5, 'm')];
 }

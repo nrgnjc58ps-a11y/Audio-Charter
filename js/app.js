@@ -4,7 +4,7 @@ import { store } from './store.js';
 import { toBackup, backupFileName, sectionRanges, uid } from './export.js';
 import {
   MAJOR_KEYS, MINOR_KEYS, keyName, normalizeBar, normalizeChord, respellBar, chordName,
-  diatonicChords, spellingFor, lastChordOf, parseChord,
+  diatonicChords, borrowedChords, isChordToken, spellingFor, lastChordOf, parseChord,
 } from './chords.js';
 
 // ---------------------------------------------------------------- constants
@@ -355,7 +355,7 @@ function renderPalettes() {
   const p = P(); if (!p) return;
   // Chords used so far, in order of first appearance.
   const used = [];
-  for (const b of p.bars) for (const c of normalizeBar(b.chord).split(/\s+/)) if (c && !used.includes(c)) used.push(c);
+  for (const b of p.bars) for (const c of normalizeBar(b.chord).split(/\s+/)) if (isChordToken(c) && !used.includes(c)) used.push(c);
   const host = $('usedChords'); host.innerHTML = '';
   if (!used.length) host.innerHTML = '<span class="none">Chords you enter show up here for quick tapping.</span>';
   used.slice(0, 24).forEach(c => host.appendChild(chordBtn(c)));
@@ -363,6 +363,8 @@ function renderPalettes() {
   const key = p.key || 'C';
   $('keyChordsLabel').textContent = p.key ? `Key of ${p.key}` : 'Key of C (set the key in the Song tab)';
   diatonicChords(key).forEach(c => kc.appendChild(chordBtn(c)));
+  const bc = $('borrowedChords'); bc.innerHTML = '';
+  borrowedChords(key).forEach(c => bc.appendChild(chordBtn(c)));
   // Builder roots in key spelling.
   const sp = spellingFor(key);
   const rr = $('rootRow'); rr.innerHTML = '';
@@ -398,9 +400,12 @@ function builderQuality(q) {
   const p = P(); if (!S.builder || !p.bars[S.builder.bar]) { toast('Tap a root note first.'); return; }
   const { bar, part } = S.builder;
   const parts = normalizeBar(p.bars[bar].chord).split(/\s+/).filter(Boolean);
-  const c = parseChord(parts[part] || '');
+  let idx = part;
+  if (!isChordToken(parts[idx])) idx = parts.findIndex(isChordToken);
+  const c = parseChord(parts[idx] || '');
   if (!c) return;
-  parts[part] = c.rootName + q + (c.bassName ? '/' + c.bassName : '');
+  const part2 = idx;
+  parts[part2] = c.rootName + q + (c.bassName ? '/' + c.bassName : '');
   setBarChord(bar, parts.join(' '));
 }
 
@@ -1034,6 +1039,13 @@ function bind() {
   $('btnSplit').addEventListener('click', splitBar);
   $('btnDeleteBar').addEventListener('click', deleteBar);
   $('btnSnap').addEventListener('click', snapBarToPlayhead);
+  $('btnNC').addEventListener('click', () => applyChord('N.C.'));
+  $('btnPush').addEventListener('click', () => {
+    const p = P(); if (!p.bars.length) return;
+    const i = targetBar(), t = normalizeBar(p.bars[i].chord);
+    if (!t) { toast('Enter the chord first, then mark it as a push.'); return; }
+    setBarChord(i, t.startsWith('>') ? t.replace(/^>\s*/, '') : '> ' + t);
+  });
   const qr = $('qualRow');
   QUALS.forEach(([q, lbl]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = lbl; b.addEventListener('click', () => builderQuality(q)); qr.appendChild(b); });
 
