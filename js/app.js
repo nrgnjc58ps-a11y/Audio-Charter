@@ -231,12 +231,7 @@ function renderBars() {
       host.innerHTML = `<div class="empty-bars"><div class="spinner" style="margin:0 auto 10px"></div><p><strong>Drafting the chart…</strong></p><p id="draftStatus">Listening to the recording</p></div>`;
     } else if (p && S.blob && !S.audio) {
       host.innerHTML = `<div class="empty-bars"><p><strong>No waveform for this recording.</strong></p><p>This phone couldn't decode it, so Auto draft can't run. Press play and use the <b>Tap</b> tab to set bar lines by ear.</p><p><button class="ghost small" type="button" id="btnSaveAudio">Save the recording to Files</button></p></div>`;
-      $('btnSaveAudio').addEventListener('click', () => {
-        const ext = (S.blob.type.includes('webm') ? 'webm' : S.blob.type.includes('ogg') ? 'ogg' : 'm4a');
-        const url = URL.createObjectURL(S.blob), a = document.createElement('a');
-        a.href = url; a.download = (p.title || 'recording') + '.' + ext; document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 4000);
-      });
+      $('btnSaveAudio').addEventListener('click', saveAudioFile);
     } else {
       host.innerHTML = `<div class="empty-bars"><p><strong>No bars yet.</strong></p><p>Open the <b>Tap</b> tab and tap along to set the bar lines, or use <b>Auto draft</b>.</p></div>`;
     }
@@ -745,7 +740,7 @@ function applyAuto(r, secs) {
   S.sel = S.selAnchor = S.selEnd = 0;
   changed(); syncSongFields();
   const res = $('autoResult'); res.hidden = false;
-  const tune = Math.abs(r.tuningCents) >= 15 ? `<dt>Tuning</dt><dd>${r.tuningCents > 0 ? '+' : ''}${r.tuningCents} cents from A440</dd>` : '';
+  const tune = `<dt>Tuning</dt><dd>${r.tuningCents > 0 ? '+' : ''}${r.tuningCents} cents from A440</dd>`;
   res.innerHTML = `<dl>
       <dt>Tempo</dt><dd>${r.bpm.toFixed(1)} BPM</dd>
       <dt>Key</dt><dd>${key}</dd>
@@ -756,6 +751,22 @@ function applyAuto(r, secs) {
     <div class="row wrap"><button class="ghost small" type="button" data-rerun="0.5">Redo at ${(r.bpm / 2).toFixed(0)} BPM</button><button class="ghost small" type="button" data-rerun="2">Redo at ${(r.bpm * 2).toFixed(0)} BPM</button></div>`;
   res.querySelectorAll('[data-rerun]').forEach(b => b.addEventListener('click', () => runAuto(r.bpm * Number(b.dataset.rerun))));
   toast(`Draft ready: ${key}, ${Math.round(r.bpm)} BPM. Play it through and fix what's off.`, 4000);
+}
+
+/** Saves this song's audio (e.g. a recording) as a file. */
+async function saveAudioFile() {
+  const p = P(); if (!S.blob) { toast('No audio for this song.'); return; }
+  const t = S.blob.type || '';
+  const fromName = (p.audioName || '').match(/\.([a-z0-9]{2,5})$/i);
+  const ext = fromName ? fromName[1] : t.includes('webm') ? 'webm' : t.includes('ogg') ? 'ogg' : t.includes('wav') ? 'wav' : t.includes('mpeg') ? 'mp3' : 'm4a';
+  const name = (p.title || 'recording').replace(/[\\/:*?"<>|]+/g, '').trim() + '.' + ext;
+  const file = new File([S.blob], name, { type: t || 'audio/mp4' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(file), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
 // ---------------------------------------------------------------- export
@@ -1023,6 +1034,7 @@ function bind() {
     pushUndo(); p.bars.forEach(b => { b.chord = respellBar(normalizeBar(b.chord), p.key); }); changed();
     toast(`Chord names spelled for ${p.key}.`);
   });
+  $('btnSaveAudioSong').addEventListener('click', saveAudioFile);
   $('btnDeleteSong').addEventListener('click', async () => {
     if (!confirm(`Delete “${P().title || 'Untitled'}” and its audio from this device?`)) return;
     await store.remove(P().id); S.project = null; show('home');
