@@ -153,19 +153,22 @@ async function openAudioBlob(blob, name) {
   show('editor');
   $('loading').hidden = false;
   $('loading').querySelector('span').textContent = 'Loading audio…';
-  try {
-    const audio = await loadAudio(blob);
-    const p = newProject(name, audio.duration);
-    await attach(p, blob, audio);
-    store.save(p);
-    store.saveAudio(p.id, blob, name);
-    toast('Loaded. Tap along in the Tap tab, or try Auto draft.');
-  } catch (e) {
-    console.error(e);
-    show('home');
-    toast('Could not read that audio file. Try MP3, M4A or WAV.', 4000);
-  } finally {
-    $('loading').hidden = true;
+  // Save first, so a recording is never lost even if this phone can't decode it.
+  const p = newProject(name, 0);
+  store.save(p);
+  store.saveAudio(p.id, blob, name);
+  let audio = null;
+  try { audio = await loadAudio(blob); }
+  catch (e) { console.error(e); }
+  p.duration = audio ? audio.duration : 0;
+  await attach(p, blob, audio);
+  store.save(p);
+  $('loading').hidden = true;
+  if (audio) {
+    runAuto();
+  } else {
+    renderBars();
+    toast('Saved, but this phone could not decode it for the waveform and auto draft. You can still play it and tap along.', 6000);
   }
 }
 
@@ -224,7 +227,19 @@ function renderBars() {
   host.innerHTML = '';
   barEls = [];
   if (!p || !p.bars.length) {
-    host.innerHTML = `<div class="empty-bars"><p><strong>No bars yet.</strong></p><p>Open the <b>Tap</b> tab and tap along to set the bar lines, or use <b>Auto draft</b>.</p></div>`;
+    if (S.analyzing) {
+      host.innerHTML = `<div class="empty-bars"><div class="spinner" style="margin:0 auto 10px"></div><p><strong>Drafting the chart…</strong></p><p id="draftStatus">Listening to the recording</p></div>`;
+    } else if (p && S.blob && !S.audio) {
+      host.innerHTML = `<div class="empty-bars"><p><strong>No waveform for this recording.</strong></p><p>This phone couldn't decode it, so Auto draft can't run. Press play and use the <b>Tap</b> tab to set bar lines by ear.</p><p><button class="ghost small" type="button" id="btnSaveAudio">Save the recording to Files</button></p></div>`;
+      $('btnSaveAudio').addEventListener('click', () => {
+        const ext = (S.blob.type.includes('webm') ? 'webm' : S.blob.type.includes('ogg') ? 'ogg' : 'm4a');
+        const url = URL.createObjectURL(S.blob), a = document.createElement('a');
+        a.href = url; a.download = (p.title || 'recording') + '.' + ext; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      });
+    } else {
+      host.innerHTML = `<div class="empty-bars"><p><strong>No bars yet.</strong></p><p>Open the <b>Tap</b> tab and tap along to set the bar lines, or use <b>Auto draft</b>.</p></div>`;
+    }
     return;
   }
   const [lo, hi] = selRange();
@@ -275,7 +290,7 @@ function selectBar(i, extend, noSeek) {
   commitTyping();
   i = Math.max(0, Math.min(i, p.bars.length - 1));
   if (extend) { S.selEnd = i; S.sel = i; }
-  else { S.sel = S.selAnchor = S.selEnd = i; if (!noSeek && S.audio) { player.seek(p.bars[i].t); clicker.reset(); } }
+  else { S.sel = S.selAnchor = S.selEnd = i; if (!noSeek && S.blob) { player.seek(p.bars[i].t); clicker.reset(); } }
   if (S.loopOn) setLoop(true);
   refreshBarClasses();
   updateSelLabel();
@@ -561,7 +576,7 @@ function steadyTimes(anchor, period, n) {
 function tapLatency() { return Number($('tapLatency').value) / 1000; }
 function onTap() {
   unlockAudio();
-  if (!S.audio) { toast('Load audio first.'); return; }
+  if (!S.blob) { toast('Load audio first.'); return; }
   if (!player.playing) { toast('Press play first, then tap along.'); return; }
   const now = performance.now();
   if (now - S.lastTapAt > 2500 && S.taps.length) S.taps = [];
@@ -630,7 +645,7 @@ function applyTaps() {
 function anchorHere() {
   const bpm = Number($('bpmInput').value);
   if (!(bpm >= 30 && bpm <= 320)) { toast('Enter a BPM first (or tap the beat).'); return; }
-  if (!S.audio) return;
+  if (!S.blob) return;
   pushUndo();
   regrid(steadyTimes(player.time, 60 / bpm, bpb()));
   P().tempo = bpm;
@@ -653,7 +668,7 @@ function loopBounds() {
 }
 function togglePlay() {
   unlockAudio();
-  if (!S.audio) { toast('No audio loaded for this song.'); return; }
+  if (!S.blob) { toast('No audio loaded for this song.'); return; }
   if (player.playing) { player.pause(); }
   else {
     if (S.loopOn) { const [a, b] = loopBounds(); if (player.time < a - 0.05 || player.time >= b) player.seek(a); }
@@ -673,13 +688,14 @@ function stepBar(dir) {
 // ---------------------------------------------------------------- auto draft
 function runAuto(forceBpm) {
   if (S.analyzing) return;
-  if (!S.audio) { toast('Load audio first.'); return; }
+  if (!S.audio) { toast(S.blob ? 'This phone could not decode this recording, so Auto draft cannot run. Tap along instead.' : 'Load audio first.', 4000); return; }
   const p = P();
   S.analyzing = true;
   $('btnAuto').disabled = true;
   const prog = $('autoProgress'); prog.hidden = false;
   const bar = prog.querySelector('i'), label = prog.querySelector('span');
   bar.style.width = '0%'; label.textContent = 'Starting…';
+  if (!p.bars.length) renderBars();
   let worker;
   try { worker = new Worker('js/analysis-worker.js'); }
   catch (e) { finish(); toast('Auto draft is not available in this browser.'); return; }
@@ -694,6 +710,7 @@ function runAuto(forceBpm) {
       const base = m.stage.startsWith('Finding') ? 0 : 40, span = m.stage.startsWith('Finding') ? 40 : 60;
       bar.style.width = (base + span * m.frac).toFixed(0) + '%';
       label.textContent = m.stage + '…';
+      const ds = $('draftStatus'); if (ds) ds.textContent = `${m.stage}… ${Math.round(base + span * m.frac)}%`;
     } else if (m.type === 'done') {
       worker.terminate(); finish();
       applyAuto(m.result, (performance.now() - t0) / 1000);
@@ -705,7 +722,7 @@ function runAuto(forceBpm) {
   worker.onerror = (e) => { worker.terminate(); finish(); toast('Auto draft failed: ' + (e.message || 'worker error'), 5000); };
   const samples = S.audio.mono.slice();
   worker.postMessage({ samples, opts }, [samples.buffer]);
-  function finish() { S.analyzing = false; $('btnAuto').disabled = false; prog.hidden = true; }
+  function finish() { S.analyzing = false; $('btnAuto').disabled = false; prog.hidden = true; if (!p.bars.length) renderBars(); }
 }
 
 function applyAuto(r, secs) {

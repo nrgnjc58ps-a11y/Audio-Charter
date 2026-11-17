@@ -143,7 +143,8 @@ export class Recorder {
     this.rec = new MediaRecorder(this.stream, type ? { mimeType: type } : undefined);
     this.chunks = [];
     this.rec.ondataavailable = (e) => { if (e.data && e.data.size) this.chunks.push(e.data); };
-    this.rec.start(1000);
+    // One continuous file (no timeslice): fragmented chunks decode badly in some browsers.
+    this.rec.start();
     this.t0 = performance.now();
     try {
       const c = audioContext();
