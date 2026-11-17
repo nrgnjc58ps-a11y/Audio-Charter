@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Audio Charter</title>
+  <meta name="description" content="Draft guitar chord charts from audio.">
+  <meta name="theme-color" content="#14161a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Charter">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <!-- ============ HOME ============ -->
+  <div id="home" class="view">
+    <header class="home-head">
+      <div class="brand"><img src="icons/icon.svg" alt="" width="36" height="36"><h1>Audio Charter</h1></div>
+      <p class="sub">Load a song or record one, then chart it bar by bar.</p>
+    </header>
+    <div class="home-actions">
+      <label class="big-action" for="fileInput">
+        <span class="ico" aria-hidden="true">♫</span>
+        <span><strong>Open audio file</strong><small>MP3, M4A, WAV, AAC…</small></span>
+      </label>
+      <input id="fileInput" type="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.aif,.aiff,.flac,.ogg,.caf" hidden>
+      <button id="btnRecord" class="big-action" type="button">
+        <span class="ico rec" aria-hidden="true">●</span>
+        <span><strong>Record</strong><small>Use the microphone</small></span>
+      </button>
+    </div>
+    <section class="library">
+      <div class="lib-head">
+        <h2>Your songs</h2>
+        <button id="btnExportAll" class="ghost small" type="button" hidden>Export all…</button>
+      </div>
+      <ul id="libraryList" class="lib-list"></ul>
+      <p id="libraryEmpty" class="muted">Songs you chart are saved on this device.</p>
+    </section>
+    <p class="muted foot">Exports a <code>.json</code> file for Chart Maker → Restore backup.</p>
+  </div>
+
+  <!-- ============ EDITOR ============ -->
+  <div id="editor" class="view" hidden>
+    <header class="topbar">
+      <button id="btnHome" class="icon-btn" type="button" aria-label="Back to songs">‹</button>
+      <input id="songTitle" class="title-input" type="text" placeholder="Song title" autocomplete="off" spellcheck="false">
+      <button id="btnUndo" class="icon-btn" type="button" aria-label="Undo" title="Undo" disabled>↶</button>
+      <button id="btnExport" class="primary small" type="button">Export</button>
+    </header>
+
+    <div class="wave-wrap">
+      <canvas id="overview" class="overview" aria-label="Whole-song waveform. Tap to jump."></canvas>
+      <canvas id="detail" class="detail" aria-label="Close-up waveform with bar lines. Drag to scrub."></canvas>
+      <div class="readout"><span id="barReadout">Bar –</span><span id="timeReadout">0:00.0</span></div>
+      <div id="loading" class="loading" hidden><div class="spinner"></div><span>Loading audio…</span></div>
+    </div>
+
+    <div class="transport">
+      <button id="btnPrevBar" class="icon-btn" type="button" aria-label="Previous bar">⏮</button>
+      <button id="btnPlay" class="play" type="button" aria-label="Play">▶</button>
+      <button id="btnNextBar" class="icon-btn" type="button" aria-label="Next bar">⏭</button>
+      <label class="speed"><span class="sr">Speed</span>
+        <select id="speed" aria-label="Playback speed">
+          <option value="0.5">50%</option><option value="0.6">60%</option><option value="0.7">70%</option>
+          <option value="0.75">75%</option><option value="0.8">80%</option><option value="0.9">90%</option>
+          <option value="1" selected>100%</option><option value="1.1">110%</option>
+        </select>
+      </label>
+      <button id="btnLoop" class="toggle" type="button" aria-pressed="false" title="Loop the selected bars (L)">Loop</button>
+      <button id="btnClick" class="toggle" type="button" aria-pressed="false" title="Click on the beat">Click</button>
+    </div>
+
+    <div class="workspace">
+      <div id="bars" class="bars" aria-label="Bars"></div>
+
+      <div class="dock">
+        <nav class="tabs" role="tablist">
+          <button role="tab" data-tab="chords" aria-selected="true">Chords</button>
+          <button role="tab" data-tab="tap">Tap</button>
+          <button role="tab" data-tab="auto">Auto draft</button>
+          <button role="tab" data-tab="song">Song</button>
+        </nav>
+
+        <!-- Chords -->
+        <section class="panel" data-panel="chords">
+          <div class="chord-entry">
+            <span id="selLabel" class="sel-label">Bar –</span>
+            <input id="chordInput" type="text" placeholder="Chord, e.g. C#m or C G" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next">
+            <button id="btnSetNext" class="primary small" type="button">Next ›</button>
+          </div>
+          <div class="row wrap tight">
+            <label class="check"><input id="followToggle" type="checkbox" checked> Follow playback</label>
+            <span class="muted hint">Tap a chord as its bar plays. Leave a bar empty and the chord carries on.</span>
+          </div>
+          <div class="palette-group"><span class="pg-label">In this song</span><div id="usedChords" class="palette"></div></div>
+          <div class="palette-group"><span class="pg-label" id="keyChordsLabel">In key</span><div id="keyChords" class="palette"></div></div>
+          <details class="builder">
+            <summary>Build a chord</summary>
+            <div id="rootRow" class="palette roots"></div>
+            <div id="qualRow" class="palette quals"></div>
+            <div class="row wrap tight">
+              <label class="check"><input id="slashMode" type="checkbox"> Next root is the bass (slash chord)</label>
+              <label class="check"><input id="addMode" type="checkbox"> Add as 2nd chord in bar</label>
+            </div>
+          </details>
+          <div class="row wrap actions">
+            <button id="btnClearBar" class="ghost small" type="button">Clear bar</button>
+            <button id="btnSection" class="ghost small" type="button">Section…</button>
+            <button id="btnSplit" class="ghost small" type="button" title="Split this bar into two bars">Split bar</button>
+            <button id="btnDeleteBar" class="ghost small" type="button">Delete bar</button>
+            <button id="btnSnap" class="ghost small" type="button" title="Move this bar line (and the ones after) to the playhead">Bar starts here</button>
+          </div>
+        </section>
+
+        <!-- Tap -->
+        <section class="panel" data-panel="tap" hidden>
+          <div class="seg" role="radiogroup" aria-label="What to tap">
+            <button data-tapmode="beats" aria-checked="true" role="radio">Every beat</button>
+            <button data-tapmode="bars" aria-checked="false" role="radio">Bar lines (the “1”)</button>
+          </div>
+          <p id="tapHelp" class="muted hint">Press play, then tap on every beat, starting on a “1”. Keep going for a few bars.</p>
+          <button id="tapPad" class="tap-pad" type="button">TAP<small id="tapInfo">0 taps</small></button>
+          <div class="row wrap">
+            <button id="btnApplyTaps" class="primary small" type="button" disabled>Use these taps</button>
+            <button id="btnResetTaps" class="ghost small" type="button">Reset taps</button>
+          </div>
+          <hr>
+          <div class="grid-form">
+            <label>Time<select id="timeSig"></select></label>
+            <label>BPM<input id="bpmInput" type="number" inputmode="decimal" min="30" max="300" step="0.1"></label>
+            <button id="btnAnchor" class="ghost small" type="button" title="Build a steady grid at this BPM with a bar line at the playhead">Bar line here</button>
+          </div>
+          <div class="row wrap">
+            <span class="pg-label">Move all bar lines</span>
+            <button class="ghost small" data-shift="-beat" type="button">◀ 1 beat</button>
+            <button class="ghost small" data-shift="-0.01" type="button">◀ 10 ms</button>
+            <button class="ghost small" data-shift="0.01" type="button">10 ms ▶</button>
+            <button class="ghost small" data-shift="beat" type="button">1 beat ▶</button>
+          </div>
+          <div class="row wrap">
+            <span class="pg-label">Tempo</span>
+            <button id="btnHalf" class="ghost small" type="button">Half time</button>
+            <button id="btnDouble" class="ghost small" type="button">Double time</button>
+          </div>
+          <label class="inline">Tap delay correction
+            <input id="tapLatency" type="range" min="0" max="150" step="5" value="40">
+            <output id="tapLatencyOut">40 ms</output>
+          </label>
+        </section>
+
+        <!-- Auto -->
+        <section class="panel" data-panel="auto" hidden>
+          <p class="hint">Listens to the recording and drafts the tempo, bar lines, key and chords. Check it by ear, then fix it in the Chords tab.</p>
+          <div class="grid-form">
+            <label>Chords
+              <select id="optDetail"><option value="simple">Major &amp; minor</option><option value="sevenths">Add 7ths</option></select>
+            </label>
+            <label>Meter
+              <select id="optMeter"><option value="song">Use Song tab time</option><option value="detect">Detect 3/4 or 4/4</option></select>
+            </label>
+          </div>
+          <div class="row wrap tight">
+            <label class="check"><input id="optSlash" type="checkbox" checked> Slash chords (B/A)</label>
+            <label class="check"><input id="optSections" type="checkbox" checked> Suggest sections</label>
+          </div>
+          <div class="row wrap">
+            <button id="btnAuto" class="primary" type="button">Draft chart</button>
+            <span id="autoWarn" class="muted hint" hidden>Replaces the bars, chords and sections you have now (Undo brings them back).</span>
+          </div>
+          <div id="autoProgress" class="progress" hidden><div class="bar"><i></i></div><span></span></div>
+          <div id="autoResult" class="auto-result" hidden></div>
+        </section>
+
+        <!-- Song -->
+        <section class="panel" data-panel="song" hidden>
+          <div class="grid-form">
+            <label class="span2">Title<input id="fTitle" type="text" autocomplete="off"></label>
+            <label class="span2">Composer<input id="fComposer" type="text" autocomplete="off"></label>
+            <label>Key<select id="fKey"></select></label>
+            <label>Time<select id="fTime"></select></label>
+            <label>Tempo<input id="fTempo" type="number" inputmode="decimal" min="20" max="320"></label>
+          </div>
+          <div class="row wrap">
+            <button id="btnRespell" class="ghost small" type="button">Respell chords for this key</button>
+          </div>
+          <p class="muted hint">Respelling changes names only (A# → Bb), never the chords themselves.</p>
+          <hr>
+          <div class="row wrap">
+            <button id="btnExport2" class="primary small" type="button">Export for Chart Maker…</button>
+            <button id="btnDeleteSong" class="danger small" type="button">Delete song</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DIALOGS ============ -->
+  <dialog id="sectionDialog" class="sheet">
+    <form method="dialog">
+      <h3>Section starting at <span id="secBarLabel">bar</span></h3>
+      <div id="secChoices" class="palette sec-choices"></div>
+      <label class="span2">Or type a name<input id="secCustom" type="text" placeholder="e.g. Pre-Chorus 2" autocomplete="off"></label>
+      <div class="row end">
+        <button id="secRemove" class="danger small" type="button">Remove section</button>
+        <button value="cancel" class="ghost small">Cancel</button>
+        <button id="secOk" value="ok" class="primary small">Set</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="exportDialog" class="sheet">
+    <form method="dialog">
+      <h3>Export for Chart Maker</h3>
+      <p id="exportSummary"></p>
+      <pre id="exportPreview" class="preview"></pre>
+      <p class="muted hint">In Chart Maker, use <strong>Restore backup</strong> and pick this file. If Restore replaces your library rather than adding to it, make a Chart Maker backup first.</p>
+      <div class="row end">
+        <button value="cancel" class="ghost small">Close</button>
+        <button id="btnShare" class="ghost small" type="button" hidden>Share…</button>
+        <button id="btnDownload" class="primary small" type="button">Save .json</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="recordDialog" class="sheet">
+    <form method="dialog">
+      <h3>Record</h3>
+      <div class="rec-meter"><i id="recLevel"></i></div>
+      <p id="recTime" class="rec-time">0:00</p>
+      <p class="muted hint">Put the phone near the speaker or the band. Recording stays on this device.</p>
+      <div class="row end">
+        <button id="recCancel" value="cancel" class="ghost small">Cancel</button>
+        <button id="recStop" class="primary small" type="button">Stop &amp; use</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
