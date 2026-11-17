@@ -83,11 +83,24 @@ export function normalizeChord(token) {
     const bm = /^([A-Ga-g])([#b♯♭]?)$/.exec(rest.slice(slash + 1));
     if (bm) { bass = '/' + bm[1].toUpperCase() + normAcc(bm[2]); rest = rest.slice(0, slash); }
   }
-  rest = rest
-    .replace(/^(min|mi|-)(?=$|\d|maj|add|sus|b|#)/, 'm')
-    .replace(/^M7/, 'maj7').replace(/^Maj/, 'maj').replace(/^Δ7?/, 'maj7')
-    .replace(/^°/, 'dim').replace(/^ø7?/, 'm7b5');
+  rest = chartMakerQuality(rest);
   return root + rest + bass;
+}
+
+/**
+ * Chord quality in Chart Maker's spelling: minor "-", major 7th "Δ7",
+ * half-diminished "ø7", diminished "°" / "°7", augmented "+".
+ * Accepts the usual alternatives (m, min, maj7, M7, m7b5, dim, aug…).
+ */
+export function chartMakerQuality(rest) {
+  return (rest || '')
+    .replace(/^(m7b5|min7b5|mi7b5|-7b5|ø7?)/, 'ø7')
+    .replace(/^(dim7|°7|o7)/, '°7')
+    .replace(/^(dim|°)/, '°')
+    .replace(/^(aug|\+)/, '+')
+    .replace(/^(maj|Maj|MAJ|ma|M|Δ)(?=\d)/, 'Δ')
+    .replace(/^(maj|Maj|MAJ)$/, '')
+    .replace(/^(min|mi|m|-)(?!aj)/, '-');
 }
 
 /** Normalizes the text for one bar (chords separated by spaces). "%", "-" or "/" alone mean "same". */
@@ -118,7 +131,7 @@ export function respellBar(text, key) {
 /** Chord name from analysis output. */
 export function chordName(root, quality, bass, key) {
   const sp = spellingFor(key);
-  return sp[root] + (quality || '') + (bass >= 0 && bass !== root ? '/' + sp[bass] : '');
+  return sp[root] + chartMakerQuality(quality || '') + (bass >= 0 && bass !== root ? '/' + sp[bass] : '');
 }
 
 /** The common chords in a key, for the quick palette. */
@@ -126,7 +139,7 @@ export function diatonicChords(key) {
   const k = parseKey(key);
   if (!k) return [];
   const sp = spellingFor(k);
-  const at = (st, q) => sp[(k.tonic + st) % 12] + q;
+  const at = (st, q) => sp[(k.tonic + st) % 12] + chartMakerQuality(q);
   return k.minor
     ? [at(0, 'm'), at(3, ''), at(5, 'm'), at(7, 'm'), at(7, ''), at(8, ''), at(10, '')]
     : [at(0, ''), at(2, 'm'), at(4, 'm'), at(5, ''), at(7, ''), at(9, 'm'), at(10, '')];
@@ -148,7 +161,7 @@ export function borrowedChords(key) {
   const k = parseKey(key);
   if (!k) return [];
   const sp = spellingFor(k);
-  const at = (st, q) => sp[(k.tonic + st) % 12] + q;
+  const at = (st, q) => sp[(k.tonic + st) % 12] + chartMakerQuality(q);
   return k.minor
     ? [at(0, ''), at(5, ''), at(1, ''), at(2, ''), at(9, 'm')]
     : [at(10, ''), at(8, ''), at(3, ''), at(2, ''), at(4, ''), at(5, 'm')];

@@ -10,7 +10,8 @@ import {
 // ---------------------------------------------------------------- constants
 const TIME_SIGS = ['4/4', '3/4', '2/4', '2/2', '6/8', '12/8', '5/4', '7/8'];
 const SECTION_NAMES = ['Intro', 'Verse', 'Pre-Chorus', 'Chorus', 'Post-Chorus', 'Bridge', 'Solo', 'Instrumental', 'Interlude', 'Break', 'Outro', 'Tag', 'Coda'];
-const QUALS = [['', 'maj'], ['m', 'm'], ['7', '7'], ['m7', 'm7'], ['maj7', 'maj7'], ['sus4', 'sus4'], ['sus2', 'sus2'], ['add9', 'add9'], ['6', '6'], ['5', '5'], ['dim', 'dim'], ['aug', 'aug'], ['m7b5', 'm7b5']];
+// Same set and spelling as Chart Maker's chord keyboard.
+const QUALS = [['', 'maj'], ['-', '-'], ['7', '7'], ['-7', '-7'], ['Δ7', 'Δ7'], ['ø7', 'ø7'], ['°7', '°7'], ['5', '5'], ['sus4', 'sus4'], ['sus2', 'sus2'], ['7sus4', '7sus4'], ['add9', 'add9'], ['6', '6'], ['9', '9'], ['°', '°'], ['+', '+']];
 
 export function beatsPerBar(time) {
   const [n, d] = String(time || '4/4').split('/').map(Number);
@@ -298,7 +299,7 @@ function updateSelLabel() {
   $('selLabel').textContent = p.bars.length ? (lo !== hi ? `Bars ${lo + 1}–${hi + 1}` : `Bar ${S.sel + 1}`) : 'Bar –';
   if (document.activeElement !== $('chordInput') || S.typingBar < 0) {
     $('chordInput').value = p.bars[S.sel] ? normalizeBar(p.bars[S.sel].chord) : '';
-    $('chordInput').placeholder = p.bars[S.sel] && !p.bars[S.sel].chord ? `${effectiveChordBefore(S.sel) || 'Chord'} (carries on)` : 'Chord, e.g. C#m or C G';
+    $('chordInput').placeholder = p.bars[S.sel] && !p.bars[S.sel].chord ? `${effectiveChordBefore(S.sel) || 'Chord'} (carries on)` : 'Chord, e.g. C#- or C G';
   }
 }
 
