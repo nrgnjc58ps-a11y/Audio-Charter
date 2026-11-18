@@ -1,6 +1,6 @@
 // Audio: decoding, waveform peaks, playback (slow-down keeps pitch), click track, recording.
 
-import { extractAac } from './mp4audio.js';
+import { extractAudio, looksLikeMp4 } from './mp4audio.js';
 
 export const ANALYSIS_SR = 22050;
 let ctx = null;
@@ -73,20 +73,31 @@ function computePeaks(mono) {
 /** Decodes a Blob into { mono, peaks, duration }. */
 /**
  * Decodes a Blob into { mono, peaks, duration }.
- * Videos (e.g. iPhone screen recordings): Safari won't decode their sound directly,
- * so if that fails the AAC soundtrack is copied out of the MP4/MOV and decoded instead.
+ * MP4/MOV/M4A (e.g. iPhone screen recordings): the AAC soundtrack is read out of
+ * the file without loading the whole video into memory, which Safari can't
+ * survive for a long screen recording, and which it won't decode anyway.
  */
 export async function loadAudio(blob) {
-  const ab = await blob.arrayBuffer();
-  let buf, skip = 0;
-  try {
-    buf = await decode(ab.slice(0)); // decodeAudioData may detach the buffer it is given
-  } catch (err) {
-    const aac = extractAac(ab);
-    if (!aac) throw err;
-    buf = await decode(aac.data.buffer);
-    skip = aac.skipSeconds;
+  let buf = null, skip = 0;
+  let mp4 = false;
+  try { mp4 = await looksLikeMp4(blob); } catch { mp4 = false; }
+  if (mp4) {
+    let a = null;
+    try { a = await extractAudio(blob); } catch { a = null; }
+    if (a) {
+      for (const data of [a.m4a, a.adts]) {
+        if (!data) continue;
+        try {
+          buf = await decode(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+          skip = a.skipSeconds;
+          break;
+        } catch { /* try the next format */ }
+      }
+    }
+    // A big video we couldn't read the soundtrack from: don't risk loading it all.
+    if (!buf && blob.size > 120 * 1024 * 1024) throw new Error('Could not read the sound from this video');
   }
+  if (!buf) buf = await decode(await blob.arrayBuffer());
   let mono = await toMono22k(buf);
   if (skip > 0) mono = mono.slice(Math.round(skip * ANALYSIS_SR));
   return { mono, peaks: computePeaks(mono), duration: mono.length / ANALYSIS_SR };
