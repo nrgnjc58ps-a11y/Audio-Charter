@@ -816,10 +816,28 @@ function downloadExport() {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
   toast('Saved ' + f.name);
 }
+async function copyExport() {
+  const text = JSON.stringify(toBackup(exportProjects));
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Older browsers: copy through a hidden text box.
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    let ok = false; try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    if (!ok) { toast('Couldn’t copy. Use Send file… instead.'); return; }
+  }
+  $('exportDialog').close();
+  const n = exportProjects.length;
+  toast(`Copied ${n === 1 ? '“' + (exportProjects[0].title || 'Untitled') + '”' : n + ' songs'}. Now open Chart Maker and tap 📋.`, 5000);
+}
+
 async function shareExport() {
   const f = exportFile();
   if (!(navigator.canShare && navigator.canShare({ files: [f] }))) { downloadExport(); return; }
-  try { await navigator.share({ files: [f] }); toast('Now in Chart Maker: ⚙︎ → Restore backup.', 4500); }
+  try { await navigator.share({ files: [f] }); $('exportDialog').close(); toast('Now in Chart Maker: ⚙︎ → Restore backup.', 4500); }
   catch (e) { if (e.name !== 'AbortError') downloadExport(); }
 }
 
@@ -1042,8 +1060,8 @@ function bind() {
   $('btnUndo').addEventListener('click', undo);
   $('btnExport').addEventListener('click', () => { commitTyping(); openExport([P()]); });
   $('btnExport2').addEventListener('click', () => { commitTyping(); openExport([P()]); });
-  $('btnDownload').addEventListener('click', downloadExport);
   $('btnShare').addEventListener('click', shareExport);
+  $('btnCopyCM').addEventListener('click', copyExport);
 
   const setTitle = (v) => { P().title = v; $('songTitle').value = v; $('fTitle').value = v; save(); };
   $('songTitle').addEventListener('input', (e) => setTitle(e.target.value));
