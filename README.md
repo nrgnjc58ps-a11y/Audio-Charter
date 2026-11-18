@@ -10,7 +10,7 @@ Drafts guitar chord charts from a recording, for **Chart Maker**. Works on iPhon
    - **Auto draft tab:** detects tempo, beats, downbeats, key and chords, then fills in a draft.
 3. **Chords tab:** with *Follow playback* on, tap a chord button as its bar plays, or select a bar and type (`C#-`, `C G`, `B/A`; `m`, `maj7` and `m7b5` are converted to `-`, `Δ7` and `ø7` for you) then press Enter to go to the next bar. Leave a bar empty and the chord carries on. **Section…** marks Intro/Verse/Chorus and so on.
 4. **Loop:** select bars (shift-click, or long-press a second bar) and press **Loop**. You can also loop a section from its label. The speed menu slows playback without changing the pitch. **Click** plays a metronome on the grid so you can check it.
-5. **Export** saves a `.json` file. In Chart Maker, use **Restore backup** and pick that file. You can export several songs from the home screen at once.
+5. **Export → Send to Chart Maker** saves a `.chart.json` file (Save to Files). In Chart Maker, tap ⚙︎ → **Restore backup** and pick it. Restore adds the song and keeps your other songs; sending a song again updates it instead of duplicating it. You can send several songs at once from the home screen.
 
 Songs and their audio are saved on the device, in the browser's IndexedDB storage.
 
@@ -26,7 +26,7 @@ Space plays and pauses. ← and → move by one bar. `T` taps. `L` turns the loo
     "repeat": false, "times": "", "ending1": "", "ending2": "", "note": "", "pageBreak": false }] }] }
 ```
 
-A chord is written where it changes and an empty bar carries the chord on. The first bar of each section always names its chord. Chords use Chart Maker's spelling: minor `-`, `Δ7`, `ø7`, `°7`, `°`, `+`. Push (`> D`) and `N.C.` pass through. The song's key is still written like `E`, `C#m` or `Bb`. Chord names are spelled for the song's key (for example Bb in flat keys). **Song → Respell chords for this key** fixes spellings after you change the key. Each song keeps the same `id` across exports.
+A chord is written where it changes and an empty bar carries the chord on. The first bar of each section always names its chord. Chords use Chart Maker's spelling: minor `-`, `Δ7`, `ø7`, `°7`, `°`, `+`. Pushes (`^D`, the chord lands an eighth early), accents (`D >>`) and `N.C.` use Chart Maker's own syntax. The song's key is still written like `E`, `C#m` or `Bb`. Chord names are spelled for the song's key (for example Bb in flat keys). **Song → Respell chords for this key** fixes spellings after you change the key. Each song keeps the same `id` across exports.
 
 ## Auto draft: how it works and what to expect
 

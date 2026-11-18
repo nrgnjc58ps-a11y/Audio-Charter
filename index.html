@@ -104,7 +104,8 @@
           <div class="palette-group"><span class="pg-label" id="keyChordsLabel">In key</span><div id="keyChords" class="palette"></div></div>
           <div class="palette-group"><span class="pg-label">Borrowed</span><div id="borrowedChords" class="palette"></div></div>
           <div class="palette-group"><span class="pg-label">Markings</span><div class="palette marks">
-            <button id="btnPush" type="button" title="Push: the chord lands just before the bar line (written > D)">&gt; push</button>
+            <button id="btnPush" type="button" title="Push: the chord comes in an eighth early, before the bar line (Chart Maker writes ^D)">^ push</button>
+            <button id="btnAccent" type="button" title="Accent the first slash; tap again for more (Chart Maker writes D >>)">&gt; accent</button>
             <button id="btnNC" type="button" title="No chord">N.C.</button>
           </div></div>
           <details class="builder">
@@ -224,14 +225,18 @@
 
   <dialog id="exportDialog" class="sheet">
     <form method="dialog">
-      <h3>Export for Chart Maker</h3>
+      <h3>Send to Chart Maker</h3>
       <p id="exportSummary"></p>
       <pre id="exportPreview" class="preview"></pre>
-      <p class="muted hint">In Chart Maker, use <strong>Restore backup</strong> and pick this file. If Restore replaces your library rather than adding to it, make a Chart Maker backup first.</p>
+      <ol class="steps">
+        <li>Tap <strong>Send to Chart Maker</strong>, then <strong>Save to Files</strong>.</li>
+        <li>In Chart Maker, tap <strong>⚙︎</strong> (Settings &amp; backup), then <strong>Restore backup</strong>, and pick the file.</li>
+      </ol>
+      <p class="muted hint">Restore adds the song and keeps all your other Chart Maker songs. Sending a song again updates it there instead of making a copy.</p>
       <div class="row end">
         <button value="cancel" class="ghost small">Close</button>
-        <button id="btnShare" class="ghost small" type="button" hidden>Share…</button>
-        <button id="btnDownload" class="primary small" type="button">Save .json</button>
+        <button id="btnDownload" class="ghost small" type="button">Save .json</button>
+        <button id="btnShare" class="primary small" type="button">Send to Chart Maker…</button>
       </div>
     </form>
   </dialog>

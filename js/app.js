@@ -4,7 +4,7 @@ import { store } from './store.js';
 import { toBackup, backupFileName, sectionRanges, uid } from './export.js';
 import {
   MAJOR_KEYS, MINOR_KEYS, keyName, normalizeBar, normalizeChord, respellBar, chordName,
-  diatonicChords, borrowedChords, isChordToken, spellingFor, lastChordOf, parseChord,
+  diatonicChords, borrowedChords, isChordToken, chordOnly, spellingFor, lastChordOf, parseChord,
 } from './chords.js';
 
 // ---------------------------------------------------------------- constants
@@ -387,7 +387,7 @@ function renderPalettes() {
   const p = P(); if (!p) return;
   // Chords used so far, in order of first appearance.
   const used = [];
-  for (const b of p.bars) for (const c of normalizeBar(b.chord).split(/\s+/)) if (isChordToken(c) && !used.includes(c)) used.push(c);
+  for (const b of p.bars) for (const t of normalizeBar(b.chord).split(/\s+/)) { const c = chordOnly(t); if (isChordToken(c) && !used.includes(c)) used.push(c); }
   const host = $('usedChords'); host.innerHTML = '';
   if (!used.length) host.innerHTML = '<span class="none">Chords you enter show up here for quick tapping.</span>';
   used.slice(0, 24).forEach(c => host.appendChild(chordBtn(c)));
@@ -434,10 +434,11 @@ function builderQuality(q) {
   const parts = normalizeBar(p.bars[bar].chord).split(/\s+/).filter(Boolean);
   let idx = part;
   if (!isChordToken(parts[idx])) idx = parts.findIndex(isChordToken);
-  const c = parseChord(parts[idx] || '');
+  const pushed = (parts[idx] || '').startsWith('^');
+  const c = parseChord(chordOnly(parts[idx] || ''));
   if (!c) return;
   const part2 = idx;
-  parts[part2] = c.rootName + q + (c.bassName ? '/' + c.bassName : '');
+  parts[part2] = (pushed ? '^' : '') + c.rootName + q + (c.bassName ? '/' + c.bassName : '');
   setBarChord(bar, parts.join(' '));
 }
 
@@ -801,8 +802,6 @@ function openExport(projects) {
   $('exportPreview').textContent = projects.length === 1
     ? data.songs[0].sections.map(s => `[${s.label}]\n${s.bars || '(empty)'}`).join('\n\n')
     : data.songs.map(s => `${s.title} — ${s.key || 'no key'}, ${s.sections.length} sections`).join('\n');
-  const file = new File([JSON.stringify(data, null, 2)], backupFileName(projects), { type: 'application/json' });
-  $('btnShare').hidden = !(navigator.canShare && navigator.canShare({ files: [file] }));
   $('exportDialog').showModal();
 }
 function exportFile() {
@@ -818,8 +817,10 @@ function downloadExport() {
   toast('Saved ' + f.name);
 }
 async function shareExport() {
-  try { await navigator.share({ files: [exportFile()], title: 'Chart Maker backup' }); }
-  catch (e) { if (e.name !== 'AbortError') toast('Sharing failed. Use Save .json instead.'); }
+  const f = exportFile();
+  if (!(navigator.canShare && navigator.canShare({ files: [f] }))) { downloadExport(); return; }
+  try { await navigator.share({ files: [f] }); toast('Now in Chart Maker: ⚙︎ → Restore backup.', 4500); }
+  catch (e) { if (e.name !== 'AbortError') downloadExport(); }
 }
 
 // ---------------------------------------------------------------- recording
@@ -1099,7 +1100,26 @@ function bind() {
     const p = P(); if (!p.bars.length) return;
     const i = targetBar(), t = normalizeBar(p.bars[i].chord);
     if (!t) { toast('Enter the chord first, then mark it as a push.'); return; }
-    setBarChord(i, t.startsWith('>') ? t.replace(/^>\s*/, '') : '> ' + t);
+    // Chart Maker writes a push as "^F" (lands an eighth early). Toggle it on the bar's first chord.
+    const parts = t.replace(/^>\s*/, '').split(/\s+/);   // also drops the old "> F" form
+    const k = parts.findIndex(isChordToken);
+    if (k < 0) return;
+    const adding = !parts[k].startsWith('^');
+    parts[k] = adding ? '^' + parts[k] : parts[k].slice(1);
+    setBarChord(i, parts.join(' '));
+    if (adding && sectionRanges(p).some(r => r.bar === i)) toast('Heads up: Chart Maker shows a push by tying it back into the bar before, so a push on the first bar of a section won’t show there.', 6000);
+  });
+  $('btnAccent').addEventListener('click', () => {
+    const p = P(); if (!p.bars.length) return;
+    const i = targetBar(), t = normalizeBar(p.bars[i].chord);
+    if (!t) { toast('Enter the chord first, then add accents.'); return; }
+    // Chart Maker: "E >>" accents the first two slashes. Each tap adds one, up to the beats in the bar.
+    const parts = t.split(/\s+/);
+    const a = parts.findIndex(x => /^>+$/.test(x));
+    if (a < 0) parts.splice(parts.findIndex(isChordToken) + 1, 0, '>');
+    else if (parts[a].length >= bpb()) parts.splice(a, 1);
+    else parts[a] += '>';
+    setBarChord(i, parts.join(' '));
   });
   const qr = $('qualRow');
   QUALS.forEach(([q, lbl]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = lbl; b.addEventListener('click', () => builderQuality(q)); qr.appendChild(b); });

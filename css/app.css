@@ -263,3 +263,5 @@ dialog input[type=text] { color: var(--text); font-size: 16px; font-weight: 400;
   .topbar { padding: 4px 8px; }
   .tabs button { padding: 8px 10px; min-height: 40px; }
 }
+
+.steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; }

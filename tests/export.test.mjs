@@ -47,3 +47,10 @@ assert.equal(borrowedChords('C').join(' '), 'Bb Ab Eb D E F-');
 assert.equal(chordName(1, 'm7', -1, 'E'), 'C#-7');
 assert.equal(chordName(0, 'maj7', -1, 'C'), 'CΔ7');
 console.log('chart maker spelling tests passed');
+
+// Pushes in Chart Maker's syntax ("^F") and accents ("E >>").
+assert.equal(normalizeBar('c ^f'), 'C ^F');
+assert.equal(normalizeBar('^c#m7'), '^C#-7');
+assert.equal(barsText(['C', '^F', '', 'G >>']), 'C | ^F | | G >>');
+assert.equal(barsText(['C', '^C', 'C']), 'C | ^C |');
+console.log('push/accent tests passed');

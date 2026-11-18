@@ -77,5 +77,5 @@ export function toBackup(projects) {
 
 export function backupFileName(projects) {
   const base = projects.length === 1 ? (projects[0].title || 'chart') : 'audio-charter-songs';
-  return base.replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 60) + '.json';
+  return base.replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 60) + '.chart.json';
 }

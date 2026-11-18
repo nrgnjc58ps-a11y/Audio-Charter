@@ -107,7 +107,9 @@ export function chartMakerQuality(rest) {
 export function normalizeBar(text) {
   const parts = (text || '').replace(/\|/g, ' ').trim().split(/\s+/).filter(Boolean);
   if (parts.length === 1 && /^(%|-|\/)$/.test(parts[0])) return '';
-  return parts.map(t => /^n\.?c\.?$/i.test(t) ? 'N.C.' : normalizeChord(t)).join(' ');
+  return parts.map(t => /^n\.?c\.?$/i.test(t) ? 'N.C.'
+    : /^\^[A-Ga-g]/.test(t) ? '^' + normalizeChord(t.slice(1))   // push (Chart Maker: "^F")
+    : normalizeChord(t)).join(' ');
 }
 
 /** { root pc, rootName, rest, bass pc, bassName } or null for non-chords. */
@@ -147,13 +149,16 @@ export function diatonicChords(key) {
 
 /** True for a chord symbol or N.C. (not markings like ">" push or "." hold). */
 export function isChordToken(tok) {
-  return /^[A-G]/.test(tok || '') || /^N\.?C\.?$/i.test(tok || '');
+  return /^\^?[A-G]/.test(tok || '') || /^N\.?C\.?$/i.test(tok || '');
 }
+
+/** The chord without a push mark: "^F" -> "F". */
+export const chordOnly = (tok) => (tok || '').replace(/^\^/, '');
 
 /** Last chord symbol written in a bar's text (markings skipped), or '' */
 export function lastChordOf(text) {
   const parts = (text || '').trim().split(/\s+/).filter(isChordToken);
-  return parts.length ? parts[parts.length - 1] : '';
+  return parts.length ? chordOnly(parts[parts.length - 1]) : '';
 }
 
 /** Chords borrowed from the parallel key, common in rock and pop. */
