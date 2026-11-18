@@ -1,8 +1,8 @@
 // Offline support: cache the app shell, serve it cache-first, refresh in the background.
-const CACHE = 'audio-charter-v8';
+const CACHE = 'audio-charter-v9';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
-  'js/app.js', 'js/audio.js', 'js/chords.js', 'js/export.js', 'js/store.js', 'js/dsp.js', 'js/analysis-worker.js',
+  'js/app.js', 'js/audio.js', 'js/mp4audio.js', 'js/chords.js', 'js/export.js', 'js/store.js', 'js/dsp.js', 'js/analysis-worker.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

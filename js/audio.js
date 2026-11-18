@@ -1,5 +1,7 @@
 // Audio: decoding, waveform peaks, playback (slow-down keeps pitch), click track, recording.
 
+import { extractAac } from './mp4audio.js';
+
 export const ANALYSIS_SR = 22050;
 let ctx = null;
 
@@ -69,11 +71,25 @@ function computePeaks(mono) {
 }
 
 /** Decodes a Blob into { mono, peaks, duration }. */
+/**
+ * Decodes a Blob into { mono, peaks, duration }.
+ * Videos (e.g. iPhone screen recordings): Safari won't decode their sound directly,
+ * so if that fails the AAC soundtrack is copied out of the MP4/MOV and decoded instead.
+ */
 export async function loadAudio(blob) {
   const ab = await blob.arrayBuffer();
-  const buf = await decode(ab);
-  const mono = await toMono22k(buf);
-  return { mono, peaks: computePeaks(mono), duration: buf.duration };
+  let buf, skip = 0;
+  try {
+    buf = await decode(ab.slice(0)); // decodeAudioData may detach the buffer it is given
+  } catch (err) {
+    const aac = extractAac(ab);
+    if (!aac) throw err;
+    buf = await decode(aac.data.buffer);
+    skip = aac.skipSeconds;
+  }
+  let mono = await toMono22k(buf);
+  if (skip > 0) mono = mono.slice(Math.round(skip * ANALYSIS_SR));
+  return { mono, peaks: computePeaks(mono), duration: mono.length / ANALYSIS_SR };
 }
 
 export class Player {
